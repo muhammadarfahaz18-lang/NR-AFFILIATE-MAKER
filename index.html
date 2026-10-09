@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NR Affiliate Maker</title>
+    <title>NR Affiliate Video Maker</title>
     <style>
-        /* Gaya dasar untuk tampilan yang nyaman di HP */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
@@ -35,7 +34,7 @@
             font-size: 13px;
             color: #666;
             margin-top: 0;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .input-group {
@@ -50,22 +49,23 @@
             color: #444;
         }
 
-        /* Lebar input 100% agar pas di layar HP */
-        input[type="text"], 
-        input[type="url"] {
+        input[type="text"], select, input[type="file"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #ccd0d5;
             border-radius: 8px;
             box-sizing: border-box;
             font-size: 14px;
+            background: #fff;
         }
 
-        input[type="text"]:focus, 
-        input[type="url"]:focus {
-            outline: none;
-            border-color: #1a73e8;
-            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        .video-preview {
+            width: 100%;
+            max-height: 250px;
+            border-radius: 8px;
+            background: #000;
+            display: none;
+            margin-bottom: 15px;
         }
 
         button {
@@ -82,31 +82,30 @@
         }
 
         button:active {
-            background-color: #1557b0;
             transform: scale(0.98);
         }
 
-        /* Area hasil/preview */
-        .result-box {
-            margin-top: 25px;
-            padding: 20px;
-            border: 2px dashed #bdc3c7;
+        #btnDownload {
+            background-color: #27ae60;
+            display: none;
+        }
+
+        .status-box {
+            margin-top: 15px;
+            padding: 15px;
             border-radius: 8px;
             background-color: #f8f9fa;
             text-align: center;
-            min-height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            font-size: 14px;
+            display: none;
         }
 
-        .loading {
-            color: #e67e22;
-            font-weight: bold;
-        }
-
-        .success {
-            color: #27ae60;
+        .loading-text { color: #e67e22; font-weight: bold; }
+        .success-text { color: #27ae60; font-weight: bold; }
+        
+        /* Canvas disembunyikan karena hanya untuk proses render di background */
+        canvas {
+            display: none;
         }
     </style>
 </head>
@@ -114,55 +113,258 @@
 
     <div class="app-container">
         <h1>NR Affiliate Maker</h1>
-        <p class="subtitle">Video Generator Tool</p>
+        <p class="subtitle">Ubah Video Mentahan Jadi Video Affiliate 9:16</p>
 
         <div class="input-group">
-            <label for="productUrl">Link Produk:</label>
-            <input type="url" id="productUrl" placeholder="Masukkan URL produk...">
+            <label>Upload Video Mentahan (MP4/MOV/WEBM):</label>
+            <input type="file" id="videoUpload" accept="video/mp4,video/quicktime,video/webm">
+        </div>
+
+        <video id="previewVideo" class="video-preview" controls playsinline muted></video>
+
+        <div class="input-group">
+            <label>Teks Hook (Muncul di Atas):</label>
+            <input type="text" id="hookText" placeholder="Contoh: BIKIN KAMU MAKIN KECE!">
         </div>
 
         <div class="input-group">
-            <label for="productName">Nama Produk:</label>
-            <input type="text" id="productName" placeholder="Contoh: Sepatu Sneakers Pria...">
+            <label>Nama Produk (Muncul di Tengah/Bawah):</label>
+            <input type="text" id="productName" placeholder="Contoh: Sepatu Sneakers Pria">
         </div>
 
-        <button onclick="prosesVideo()">Generate Video</button>
-
-        <div class="result-box" id="resultArea">
-            <p style="color: #888; font-size: 14px;">Preview hasil video akan muncul di sini.</p>
+        <div class="input-group">
+            <label>Teks Call To Action / CTA (Muncul di Bawah):</label>
+            <input type="text" id="ctaText" placeholder="Contoh: Klik Keranjang Kuning Sekarang!">
         </div>
+
+        <div class="input-group">
+            <label>Durasi Video Hasil:</label>
+            <select id="videoDuration">
+                <option value="10">10 Detik</option>
+                <option value="15">15 Detik</option>
+                <option value="20">20 Detik</option>
+                <option value="30">30 Detik</option>
+            </select>
+        </div>
+
+        <button id="btnProses" onclick="buatVideo()">BUAT VIDEO AFFILIATE</button>
+        
+        <div id="statusArea" class="status-box"></div>
+        
+        <button id="btnDownload" onclick="downloadVideo()">DOWNLOAD VIDEO</button>
+
+        <!-- Elemen canvas untuk merender rasio 9:16 -->
+        <canvas id="renderCanvas" width="720" height="1280"></canvas>
     </div>
 
     <script>
-        // Fungsi untuk menangani proses saat tombol ditekan
-        function prosesVideo() {
-            // Mengambil nilai dari kolom input
-            const productUrl = document.getElementById('productUrl').value;
-            const productName = document.getElementById('productName').value;
-            const resultArea = document.getElementById('resultArea');
+        const videoUpload = document.getElementById('videoUpload');
+        const previewVideo = document.getElementById('previewVideo');
+        const canvas = document.getElementById('renderCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusArea = document.getElementById('statusArea');
+        const btnProses = document.getElementById('btnProses');
+        const btnDownload = document.getElementById('btnDownload');
 
-            // Pengecekan jika input masih kosong
-            if(productUrl === "" || productName === "") {
-                alert("Halo! Mohon isi Link dan Nama Produk terlebih dahulu ya.");
+        let mediaRecorder;
+        let recordedChunks = [];
+        let finalVideoUrl = '';
+        let renderAnimation;
+
+        // Tampilkan preview saat video dipilih
+        videoUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                previewVideo.src = fileURL;
+                previewVideo.style.display = 'block';
+            }
+        });
+
+        async function buatVideo() {
+            if (!videoUpload.files[0]) {
+                alert("Mohon upload video mentahan terlebih dahulu!");
                 return;
             }
 
-            // Menampilkan status proses simulasi
-            resultArea.innerHTML = '<p class="loading">⏳ Sedang memproses data video...</p>';
+            // Siapkan UI
+            btnProses.disabled = true;
+            btnProses.style.backgroundColor = "#95a5a6";
+            btnDownload.style.display = "none";
+            statusArea.style.display = "block";
+            statusArea.innerHTML = `<span class="loading-text">⏳ Sedang memproses video...<br>Membutuhkan waktu sesuai durasi. JANGAN TUTUP HALAMAN INI.</span>`;
 
-            // Simulasi jeda waktu (loading) selama 2 detik sebelum hasil muncul
+            // Reset video ke awal
+            previewVideo.currentTime = 0;
+            previewVideo.muted = false; // Buka suara agar bisa terekam
+            recordedChunks = [];
+
+            // Mainkan video (harus dari interaksi user)
+            try {
+                await previewVideo.play();
+            } catch (err) {
+                alert("Browser memblokir pemutaran video. Pastikan Anda mengklik layar.");
+                resetUI();
+                return;
+            }
+
+            const durationSec = parseInt(document.getElementById('videoDuration').value);
+            startRecording(durationSec);
+            drawFrame();
+        }
+
+        function startRecording(durationSec) {
+            // Ambil stream gambar dari Canvas pada 30 FPS
+            const canvasStream = canvas.captureStream(30);
+            let finalStream = canvasStream;
+
+            // Coba gabungkan suara dari video asli (jika didukung browser HP)
+            try {
+                let videoStream;
+                if (previewVideo.captureStream) {
+                    videoStream = previewVideo.captureStream();
+                } else if (previewVideo.mozCaptureStream) {
+                    videoStream = previewVideo.mozCaptureStream();
+                }
+                
+                if (videoStream && videoStream.getAudioTracks().length > 0) {
+                    const audioTrack = videoStream.getAudioTracks()[0];
+                    finalStream = new MediaStream([canvasStream.getVideoTracks()[0], audioTrack]);
+                }
+            } catch (e) {
+                console.log("Audio tidak bisa diekstrak di browser ini, merekam video tanpa suara.");
+            }
+
+            // Konfigurasi Perekam
+            const options = { mimeType: 'video/webm' };
+            try {
+                mediaRecorder = new MediaRecorder(finalStream, options);
+            } catch (e) {
+                // Fallback jika webm tidak didukung (biasanya di iOS)
+                mediaRecorder = new MediaRecorder(finalStream); 
+            }
+
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = function() {
+                const blob = new Blob(recordedChunks, { type: 'video/mp4' }); // Output diakali sbg mp4 agar mudah didownload
+                finalVideoUrl = URL.createObjectURL(blob);
+                
+                // Hentikan video asli dan animasi canvas
+                previewVideo.pause();
+                cancelAnimationFrame(renderAnimation);
+                
+                // Ubah UI
+                statusArea.innerHTML = `<span class="success-text">✅ Video Berhasil Dibuat!</span>`;
+                btnDownload.style.display = "block";
+                resetUI();
+            };
+
+            // Mulai rekam
+            mediaRecorder.start();
+
+            // Berhenti otomatis saat durasi habis atau video asli selesai
             setTimeout(() => {
-                resultArea.innerHTML = `
-                    <h3 class="success">✅ Proses Selesai!</h3>
-                    <p style="font-size: 14px; margin: 5px 0;"><strong>Produk:</strong> ${productName}</p>
-                    <a href="${productUrl}" target="_blank" style="color: #1a73e8; font-size: 14px; text-decoration: none; font-weight: bold;">🔗 Cek Link Original</a>
-                    <p style="font-size: 12px; color: #7f8c8d; margin-top: 15px;">
-                        (Ini adalah tampilan awal. Logika generator video Anda nanti bisa dihubungkan di bagian ini)
-                    </p>
-                `;
-            }, 2000);
+                if(mediaRecorder.state === "recording") {
+                    mediaRecorder.stop();
+                }
+            }, durationSec * 1000);
+
+            // Berhenti jika video habis sebelum target durasi
+            previewVideo.onended = () => {
+                if(mediaRecorder.state === "recording") {
+                    mediaRecorder.stop();
+                }
+            };
+        }
+
+        function drawFrame() {
+            if (previewVideo.paused || previewVideo.ended) return;
+
+            // Bersihkan Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. LOGIKA CROP OTOMATIS (Ke 9:16 / 720x1280)
+            const targetRatio = 9 / 16;
+            const videoRatio = previewVideo.videoWidth / previewVideo.videoHeight;
+            
+            let sourceX = 0, sourceY = 0, sourceW = previewVideo.videoWidth, sourceH = previewVideo.videoHeight;
+
+            if (videoRatio > targetRatio) {
+                // Video melebar (contoh: 16:9). Potong kiri kanan, ambil tengah.
+                sourceW = previewVideo.videoHeight * targetRatio;
+                sourceX = (previewVideo.videoWidth - sourceW) / 2;
+            } else {
+                // Video memanjang (lebih tinggi dari 9:16). Potong atas bawah.
+                sourceH = previewVideo.videoWidth / targetRatio;
+                sourceY = (previewVideo.videoHeight - sourceH) / 2;
+            }
+
+            // Gambar video mentahan yang sudah di-crop ke canvas
+            ctx.drawImage(previewVideo, sourceX, sourceY, sourceW, sourceH, 0, 0, canvas.width, canvas.height);
+
+            // 2. LOGIKA TEKS / OVERLAY
+            const hook = document.getElementById('hookText').value.toUpperCase();
+            const product = document.getElementById('productName').value;
+            const cta = document.getElementById('ctaText').value.toUpperCase();
+
+            // Setingan gaya font dasar
+            ctx.textAlign = "center";
+            ctx.shadowColor = "rgba(0, 0, 0, 0.8)"; // Efek bayangan agar teks terbaca walau background terang
+            ctx.shadowBlur = 8;
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = "black";
+
+            // Gambar Teks Hook (ATAS)
+            if(hook) {
+                ctx.font = "bold 55px Arial";
+                ctx.fillStyle = "#FFD700"; // Warna kuning emas
+                ctx.strokeText(hook, canvas.width / 2, 180);
+                ctx.fillText(hook, canvas.width / 2, 180);
+            }
+
+            // Gambar Teks Produk (TENGAH / BAWAH)
+            if(product) {
+                ctx.font = "bold 65px Arial";
+                ctx.fillStyle = "#FFFFFF"; // Warna putih
+                ctx.strokeText(product, canvas.width / 2, 950);
+                ctx.fillText(product, canvas.width / 2, 950);
+            }
+
+            // Gambar Teks CTA (BAWAH)
+            if(cta) {
+                // Buat kotak latar belakang untuk CTA
+                ctx.fillStyle = "#e74c3c"; // Merah
+                ctx.fillRect(50, 1050, canvas.width - 100, 100);
+                
+                ctx.font = "bold 45px Arial";
+                ctx.fillStyle = "#FFFFFF";
+                ctx.shadowBlur = 0; // Matikan shadow untuk teks dalam kotak
+                ctx.fillText(cta, canvas.width / 2, 1115);
+            }
+
+            // Ulangi terus menerus (loop) selama video diputar
+            renderAnimation = requestAnimationFrame(drawFrame);
+        }
+
+        function downloadVideo() {
+            if (!finalVideoUrl) return;
+            
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = finalVideoUrl;
+            a.download = 'Video_Affiliate_' + Date.now() + '.mp4';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function resetUI() {
+            btnProses.disabled = false;
+            btnProses.style.backgroundColor = "#1a73e8";
         }
     </script>
-
 </body>
 </html>
