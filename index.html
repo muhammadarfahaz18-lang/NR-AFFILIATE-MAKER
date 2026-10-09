@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NR Affiliate Maker</title>
+    <style>
+        /* Gaya dasar untuk tampilan yang nyaman di HP */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        
+        .app-container {
+            max-width: 100%;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a73e8;
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #444;
+        }
+
+        /* Lebar input 100% agar pas di layar HP */
+        input[type="text"], 
+        input[type="url"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccd0d5;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus, 
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 10px;
+            box-shadow: 0 2px 4px rgba(26,115,232,0.3);
+        }
+
+        button:active {
+            background-color: #1557b0;
+            transform: scale(0.98);
+        }
+
+        /* Area hasil/preview */
+        .result-box {
+            margin-top: 25px;
+            padding: 20px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .loading {
+            color: #e67e22;
+            font-weight: bold;
+        }
+
+        .success {
+            color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <h1>NR Affiliate Maker</h1>
+        <p class="subtitle">Video Generator Tool</p>
+
+        <div class="input-group">
+            <label for="productUrl">Link Produk:</label>
+            <input type="url" id="productUrl" placeholder="Masukkan URL produk...">
+        </div>
+
+        <div class="input-group">
+            <label for="productName">Nama Produk:</label>
+            <input type="text" id="productName" placeholder="Contoh: Sepatu Sneakers Pria...">
+        </div>
+
+        <button onclick="prosesVideo()">Generate Video</button>
+
+        <div class="result-box" id="resultArea">
+            <p style="color: #888; font-size: 14px;">Preview hasil video akan muncul di sini.</p>
+        </div>
+    </div>
+
+    <script>
+        // Fungsi untuk menangani proses saat tombol ditekan
+        function prosesVideo() {
+            // Mengambil nilai dari kolom input
+            const productUrl = document.getElementById('productUrl').value;
+            const productName = document.getElementById('productName').value;
+            const resultArea = document.getElementById('resultArea');
+
+            // Pengecekan jika input masih kosong
+            if(productUrl === "" || productName === "") {
+                alert("Halo! Mohon isi Link dan Nama Produk terlebih dahulu ya.");
+                return;
+            }
+
+            // Menampilkan status proses simulasi
+            resultArea.innerHTML = '<p class="loading">⏳ Sedang memproses data video...</p>';
+
+            // Simulasi jeda waktu (loading) selama 2 detik sebelum hasil muncul
+            setTimeout(() => {
+                resultArea.innerHTML = `
+                    <h3 class="success">✅ Proses Selesai!</h3>
+                    <p style="font-size: 14px; margin: 5px 0;"><strong>Produk:</strong> ${productName}</p>
+                    <a href="${productUrl}" target="_blank" style="color: #1a73e8; font-size: 14px; text-decoration: none; font-weight: bold;">🔗 Cek Link Original</a>
+                    <p style="font-size: 12px; color: #7f8c8d; margin-top: 15px;">
+                        (Ini adalah tampilan awal. Logika generator video Anda nanti bisa dihubungkan di bagian ini)
+                    </p>
+                `;
+            }, 2000);
+        }
+    </script>
+
+</body>
+</html>
